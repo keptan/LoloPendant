@@ -24,7 +24,7 @@ function scrambleNames (guild)
 
 	guild.members.fetch().then
 	(
-		guild.members.cache.each(member => names.push({member: member, name: member.nickname}))
+		guild.members.cache.each(member => names.push({member: member, name: member.user.username}))
 	);
 
 	if(globalNames === false) globalNames = new Array(names);
@@ -53,7 +53,7 @@ function scrambleAll ()
 {
 	console.log("scrambling...");
 	client.guilds.cache.forEach(server => scrambleNames(server));
-	setTimeout(scrambleAll, Math.random() * (300 * 1000));
+	setTimeout(scrambleAll, Math.random() * (1600 * 1000));
 }
 
 client.on('message', message => 
@@ -72,4 +72,4 @@ client.on('message', message =>
 		}
 	});
 
-setTimeout(scrambleAll, Math.random() * (300 * 1000));
+setTimeout(scrambleAll, Math.random() * (1600 * 1000));
