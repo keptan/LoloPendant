@@ -53,7 +53,7 @@ function scrambleAll ()
 {
 	console.log("scrambling...");
 	client.guilds.cache.forEach(server => scrambleNames(server));
-	setTimeout(scrambleAll, Math.random() * 300 * 1000);
+	setTimeout(scrambleAll, Math.random() * (300 * 1000));
 }
 
 client.on('message', message => 
@@ -72,4 +72,4 @@ client.on('message', message =>
 		}
 	});
 
-setTimeout(scrambleAll, Math.random() * 300 * 1000);
+setTimeout(scrambleAll, Math.random() * (300 * 1000));
