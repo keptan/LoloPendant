@@ -7,6 +7,8 @@ const config = require('./config.json')
 client.login(config.token);
 
 var hooks = new Map();
+var gnames = new Array();
+var gpictures = new Array();
 
 function shuffleNames (array)
 {
@@ -24,8 +26,12 @@ function scrambleNames (guild)
 
 	guild.members.fetch().then
 	(
-		guild.members.cache.each(member => names.push({member: member, name: member.user.username}))
-	);
+
+		guild.members.cache.each(member => 
+			{
+			names.push({member: member, name: member.user.username})
+			}
+	));
 
 
 	shuffleNames(names);
@@ -62,20 +68,43 @@ async function retrieveHook (channel)
 	return hooks.get(channel);
 }
 
+async function populateNames (guild)
+{
 
-client.on('message', message => 
+	var color, name, uri;
+//	await guild.members.fetch();
+	const member = await guild.members.cache.random();
+
+	color = member.displayHexColor;
+	name  = member.nickname;
+	uri   = member.user.displayAvatarURL();
+
+
+	return {color: color, name: name, uri: uri};
+}
+
+
+
+client.on('message', async message  =>  
 	{
 		if (message.webhookID) return;
-		if (message.content === '!scramble')
+		if (message.content)
 		{
-			message.channel.send('✨✨✨ UOOOOOOOOOOOO');
+
+			var uris = [];
+			message.attachments.forEach(a => { uris.push(a.proxyURL)});
+
+			const mysteryUser =  await populateNames(message.guild);
+			console.log(mysteryUser);
 
 			retrieveHook(message.channel).then(h => 
-				h.send(message.content, {embeds: message.embeds, username: message.author.username, avatarURL: message.author.displayAvatarURL() })); 
+				h.send(message.content, {files: uris, attachments: message.attachments, color: mysteryUser.color , username: mysteryUser.name , avatarURL: mysteryUser.uri })
+				.then(message.delete()));
 
 
 
-			scrambleAll();
+
+			//scrambleAll();
 		}
 
 		if (message.content == "!unscramble")
