@@ -61,13 +61,16 @@ client.on('message', message =>
 		if (message.content === '!scramble')
 		{
 			message.channel.send('✨✨✨ UOOOOOOOOOOOO');
+			const enbie = new Discord.MessageEmbed()
+			.setAuthor(message.author.username, message.author.avatarURL)
+			.addFields( {name: '', value: message.content});
+
+			message.channel.send(enbie);
 			scrambleAll();
-			//scrambleNames(message.guild);
 		}
 
 		if (message.content == "!unscramble")
 		{
-			message.channel.send('uooh');
 			unscrambleNames(message.guild);
 		}
 	});
