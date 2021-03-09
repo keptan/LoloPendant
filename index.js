@@ -7,8 +7,12 @@ const config = require('./config.json')
 client.login(config.token);
 
 var hooks = new Map();
-var gnames = new Array();
-var gpictures = new Array();
+
+client.on("ready", async =>
+	{
+		client.guilds.cache.forEach(async server => server.members.fetch());
+	});
+
 
 function shuffleNames (array)
 {
@@ -29,7 +33,7 @@ function scrambleNames (guild)
 
 		guild.members.cache.each(member => 
 			{
-			names.push({member: member, name: member.user.username})
+			names.push({member: member, name: mmber.user.username})
 			}
 	));
 
@@ -73,22 +77,30 @@ async function populateNames (guild)
 
 	var color, name, uri;
 //	await guild.members.fetch();
-	const member = await guild.members.cache.random();
-
+	var member = await guild.members.cache.random();
 	color = member.displayHexColor;
-	name  = member.nickname;
+	name  = member.displayName;
+	member = await guild.members.cache.random();
 	uri   = member.user.displayAvatarURL();
 
 
 	return {color: color, name: name, uri: uri};
 }
 
+async function fixNames (guild)
+{
+	await guild.members.fetch();
+	guild.members.cache.each(m => m.setNickname(m.user.username).catch(e => undefined));
+}
+
+
 
 
 client.on('message', async message  =>  
 	{
 		if (message.webhookID) return;
-		if (message.content)
+		if (message.content === "!fixnames") return fixNames(message.guild);
+		if (message.channel.name === "hell")
 		{
 
 			var uris = [];
@@ -104,13 +116,7 @@ client.on('message', async message  =>
 
 
 
-			//scrambleAll();
-		}
-
-		if (message.content == "!unscramble")
-		{
-			unscrambleNames(message.guild);
 		}
 	});
 
-setTimeout(scrambleAll, Math.random() * (1600 * 1000));
+//setTimeout(scrambleAll, Math.random() * (1600 * 1000));
