@@ -6,7 +6,7 @@ const config = require('./config.json')
 
 client.login(config.token);
 
-var globalNames = false;
+var hooks = new Map();
 
 function shuffleNames (array)
 {
@@ -27,7 +27,6 @@ function scrambleNames (guild)
 		guild.members.cache.each(member => names.push({member: member, name: member.user.username}))
 	);
 
-	if(globalNames === false) globalNames = new Array(names);
 
 	shuffleNames(names);
 
@@ -39,14 +38,6 @@ function scrambleNames (guild)
 
 function unscrambleNames (guild)
 {
-
-	if(globalNames === false) return;
-	for(var n of globalNames)
-	{
-		n.member.setNickname(n.name).catch(e => undefined);
-
-	}
-
 }
 
 function scrambleAll ()
@@ -56,16 +47,34 @@ function scrambleAll ()
 	setTimeout(scrambleAll, Math.random() * (1600 * 1000));
 }
 
+async function retrieveHook (channel)
+{
+	if(hooks.has(channel)) return hooks.get(channel);
+
+	ret = await channel.fetchWebhooks();
+	if(!ret.size)
+	{
+		await channel.createWebhook('loloHook');
+	}
+	ret = await channel.fetchWebhooks();
+	hooks.set(channel, ret.first());
+
+	return hooks.get(channel);
+}
+
+
 client.on('message', message => 
 	{
+		if (message.webhookID) return;
 		if (message.content === '!scramble')
 		{
 			message.channel.send('✨✨✨ UOOOOOOOOOOOO');
-			const enbie = new Discord.MessageEmbed()
-			.setAuthor(message.author.username, message.author.avatarURL)
-			.addFields( {name: '', value: message.content});
 
-			message.channel.send(enbie);
+			retrieveHook(message.channel).then(h => 
+				h.send(message.content, {embeds: message.embeds, username: message.author.username, avatarURL: message.author.displayAvatarURL() })); 
+
+
+
 			scrambleAll();
 		}
 
