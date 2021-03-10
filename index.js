@@ -3,10 +3,15 @@ const myIntents = new Discord.Intents(Discord.Intents.NON_PRIVILEGED);
 myIntents.add('GUILD_MEMBERS', 'GUILD_PRESENCES');
 const client = new Discord.Client({forceFetchUsers: true, ws: { intents: myIntents }});
 const config = require('./config.json')
+const Markov = require('ez-markov')
+
 
 client.login(config.token);
 
 var hooks = new Map();
+var generators = new Map();
+
+const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 client.on("ready", async =>
 	{
@@ -87,6 +92,18 @@ async function populateNames (guild)
 	return {color: color, name: name, uri: uri};
 }
 
+function generateMessage ()
+{
+	let index = Math.floor(Math.random() * generators.size);
+	let acc = 0;
+	var key;
+	for(let key of generators.keys())
+	{
+		if (acc++ === index) return {member: key, message: generators.get(key).getSentence()};
+	}
+}
+
+
 async function fixNames (guild)
 {
 	await guild.members.fetch();
@@ -99,7 +116,19 @@ async function fixNames (guild)
 client.on('message', async message  =>  
 	{
 		if (message.webhookID) return;
-		if (message.content === "!fixnames") return fixNames(message.guild);
+		
+		if (!generators.has(message.member))
+		{
+			generators.set(message.member, new Markov());
+		}
+
+		const gen = generators.get(message.member);
+		if(message.content)
+		{
+			gen.addCorpus(message.content);
+		}
+
+
 		if (message.channel.name === "hell")
 		{
 
@@ -112,10 +141,13 @@ client.on('message', async message  =>
 			retrieveHook(message.channel).then(h => 
 				h.send(message.content, {files: uris, attachments: message.attachments, color: mysteryUser.color , username: mysteryUser.name , avatarURL: mysteryUser.uri })
 				.then(message.delete()));
+		}
 
-
-
-
+		if( message.channel.name == "hell" && Math.random() > 0.70)
+		{
+			const rMessage = generateMessage();	
+			wait(Math.random() * (2600 * 1000)).then( () => retrieveHook(message.channel).then(h =>
+				h.send(rMessage.message, {username: rMessage.member.displayName, avatarURL: rMessage.member.user.displayAvatarURL()})));
 		}
 	});
 
