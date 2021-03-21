@@ -4,19 +4,56 @@ myIntents.add('GUILD_MEMBERS', 'GUILD_PRESENCES');
 const client = new Discord.Client({forceFetchUsers: true, ws: { intents: myIntents }});
 const config = require('./config.json')
 const Markov = require('ez-markov')
-
+const Eater  = require('discord-fetch-all')
 
 client.login(config.token);
 
 var hooks = new Map();
 var generators = new Map();
+var channelsEaten = new Set();
 
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-client.on("ready", async =>
+
+function MarkovKing (c)
+{
+	const channelsEaten = new Set();
+	const generators	= new Map();
+
+	async function eatMessages (channel)
 	{
-		client.guilds.cache.forEach(async server => server.members.fetch());
-	});
+		if(!channel.isText()) return;
+		if(this.channelsEaten.has(channel)) return; 
+		this.channelsEaten.add(channel);
+
+		const allMessages = await Eater.messages(channel, {userOnly: true});
+
+		for (const m of allMessages)
+		{
+			if(!this.generators.has(m.member)) this.generators.set(m.member, new Markov());
+			const gen = this.generators.get(m.member);
+			if(m.content)
+			{
+				gen.addCorpus(m.content.replace(/(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)/, ""));
+			}
+		}
+	}
+
+
+	function generateMessage ()
+	{
+		let index = Math.floor(Math.random() * generators.size);
+		let acc = 0;
+		var key;
+		for(let key of this.generators.keys())
+		{
+			if (acc++ === index) return {member: key, message: this.generators.get(key).getSentence()};
+		}
+	}
+};
+
+
+
 
 
 function shuffleNames (array)
@@ -92,23 +129,26 @@ async function populateNames (guild)
 	return {color: color, name: name, uri: uri};
 }
 
-function generateMessage ()
+
+
+async function spamPost ()
 {
-	let index = Math.floor(Math.random() * generators.size);
-	let acc = 0;
-	var key;
-	for(let key of generators.keys())
+	for(var channel of channelsEaten)
 	{
-		if (acc++ === index) return {member: key, message: generators.get(key).getSentence()};
+
+		if(channel.name !== "hell") continue;
+	
+		setTimeout(spamPost, Math.random() * (1460 * 1000));
+		const rMessage = generateMessage();	
+		if(rMessage.message === "") return;
+
+		 retrieveHook(channel).then(h =>
+			h.send(rMessage.message, {username: rMessage.member.displayName, avatarURL: rMessage.member.user.displayAvatarURL()})).catch(e => undefined);
+
 	}
 }
 
 
-async function fixNames (guild)
-{
-	await guild.members.fetch();
-	guild.members.cache.each(m => m.setNickname(m.user.username).catch(e => undefined));
-}
 
 
 
@@ -125,7 +165,13 @@ client.on('message', async message  =>
 		const gen = generators.get(message.member);
 		if(message.content)
 		{
-			gen.addCorpus(message.content);
+			gen.addCorpus(message.content.replace(/(https?:\/\/)?([\da-z\.-]+)\.([a-z\.]{2,6})([\/\w \.-]*)/, ""));
+		}
+
+		if (message.content === "!test")
+		{
+			spamPost();
+			return;
 		}
 
 
@@ -140,15 +186,28 @@ client.on('message', async message  =>
 
 			retrieveHook(message.channel).then(h => 
 				h.send(message.content, {files: uris, attachments: message.attachments, color: mysteryUser.color , username: mysteryUser.name , avatarURL: mysteryUser.uri })
-				.then(message.delete()));
+				.then(wait(4000).then(message.delete())));
 		}
 
-		if( message.channel.name == "hell" && Math.random() > 0.70)
+		if( message.channel.name == "hell" && Math.random() > 0.90)
 		{
 			const rMessage = generateMessage();	
 			wait(Math.random() * (2600 * 1000)).then( () => retrieveHook(message.channel).then(h =>
-				h.send(rMessage.message, {username: rMessage.member.displayName, avatarURL: rMessage.member.user.displayAvatarURL()})));
+				h.send(rMessage.message, {username: rMessage.member.displayName, avatarURL: rMessage.member.user.displayAvatarURL()}))).catch(e => undefined);
 		}
 	});
 
 //setTimeout(scrambleAll, Math.random() * (1600 * 1000));
+client.on("ready", async =>
+	{
+		client.guilds.cache.forEach(async server => server.members.fetch());
+		client.guilds.cache.forEach(async server => 
+			{
+				server.channels.cache.each(c => eatMessages(c))
+				setTimeout(spamPost, 3000);
+				console.log("ready!");
+			}
+		);
+
+	});
+
