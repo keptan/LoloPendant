@@ -42,6 +42,16 @@ function MessageScanners ()
 			s.feed(m)
 		}
 	}
+
+	this.add = function (s)
+	{
+		this.scanners.add(s)
+	}
+
+	this.remove = function (s)
+	{
+		this.scanners.remove(s)
+	}
 }
 
 function MarkovKing (c)
@@ -97,18 +107,22 @@ function Unpersonator(hooks)
 
 	this.feed = async function (m)
 	{
+		if(m.webhookID) return 
+		if(m.channel.name !== "hell") return
 		const uris = [];
-		m.attatchments.forEach(a => {uris.push(a.proxyURL)})
+		m.attachments.forEach(a => {uris.push(a.proxyURL)})
 
 		const member = await this.populateNames(m.guild)
 		const hook   = await this.hooks.retrieveHook(m.channel)
 		hook.send(m.content, {files: uris, attatchments: m.attatchments, username: member.name, avatarURL: member.uri})
+		message.delete()
 	}
 }
 
 const hookMan  = new HookManager()
 const unperson = new Unpersonator(hookMan)
 const scanners = new MessageScanners()
+
 
 scanners.add(unperson)
 
