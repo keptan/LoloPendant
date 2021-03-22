@@ -115,16 +115,40 @@ function Unpersonator(hooks)
 		const member = await this.populateNames(m.guild)
 		const hook   = await this.hooks.retrieveHook(m.channel)
 		hook.send(m.content, {files: uris, attatchments: m.attatchments, username: member.name, avatarURL: member.uri})
-		message.delete()
+		m.delete()
 	}
 }
+
+function Harass ()
+{
+	this.targets = new Map()
+
+	this.add = function (s)
+	{
+		const split = s.split(' ')
+		if(split[0] === '!harass') this.targets.set(split[1], split[2])
+		if(split[0] === '!unharass') this.targets.delete(split[1])
+	}
+
+	this.feed = function (m)
+	{
+		this.add(m.content)
+		if(this.targets.has(m.author.id))
+		{
+			m.react(this.targets.get(m.author.id))
+		}
+	}
+}
+
 
 const hookMan  = new HookManager()
 const unperson = new Unpersonator(hookMan)
 const scanners = new MessageScanners()
+const perv	   = new Harass()
 
 
 scanners.add(unperson)
+scanners.add(perv)
 
 client.on('message', async message  =>  
 {
