@@ -8,6 +8,10 @@ const Eater  = require('discord-fetch-all')
 
 client.login(config.token)
 
+function sleep(ms) 
+{
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 function HookManager ()
 {
@@ -54,9 +58,11 @@ function MessageScanners ()
 	}
 }
 
-function MarkovKing (c)
+function MarkovKing (c, h)
 {
 	this.client = c
+	this.hooks = h
+
 	this.channelsEaten = new Set()
 	this.generators	= new Map()
 
@@ -89,7 +95,56 @@ function MarkovKing (c)
 			if (acc++ === index) return {member: key, message: this.generators.get(key).getSentence()}
 		}
 	}
+
+	this.init = async function (client)
+	{
+		client.guilds.cache.forEach(async server => server.members.fetch())
+		client.guilds.cache.forEach(async server => 
+		{
+			server.channels.cache.each(c => this.eatMessages(c))
+		}
+		)
+
+	}
+
+	this.post = async function (channel)
+	{
+
+			const post = this.generateMessage()
+			const hook = await this.hooks.retrieveHook(channel)
+			hook.send(post.message, {username: post.member.displayName, avatarURL: post.member.user.displayAvatarURL()}).catch(e => undefined)
+	}
+
+
+	this.feed = async function (m)
+	{
+		const split = m.content.split(' ')
+		if(split[0] == '!rpost')
+		{
+			await this.post(m.channel)
+			m.delete()
+		}
+
+		if(split[0] == '!wave')
+		{
+			postWave(this, m.channel)
+		}
+	}
+
 }
+
+async function postWave (m, c)
+{
+	for(var i = 0; i < Math.random() * 10; i++)
+	{
+		m.post(c)
+		await sleep (Math.random() * 60)
+	}
+	await sleep( Math.random() * 60 * 60)
+	postWave(m, c)
+}
+
+
 
 function Unpersonator(hooks)
 {
@@ -111,10 +166,11 @@ function Unpersonator(hooks)
 		if(m.channel.name !== "hell") return
 		const uris = [];
 		m.attachments.forEach(a => {uris.push(a.proxyURL)})
+		if(uris.length) await sleep(1000)
 
 		const member = await this.populateNames(m.guild)
 		const hook   = await this.hooks.retrieveHook(m.channel)
-		hook.send(m.content, {files: uris, attatchments: m.attatchments, username: member.name, avatarURL: member.uri})
+		hook.send(m.content, {files: uris, attatchments: m.attatchments, username: member.name, avatarURL: member.uri}).catch(e => undefined)
 		m.delete()
 	}
 }
@@ -140,34 +196,24 @@ function Harass ()
 	}
 }
 
-
 const hookMan  = new HookManager()
 const unperson = new Unpersonator(hookMan)
 const scanners = new MessageScanners()
+const markov   = new MarkovKing(client, hookMan)
 const perv	   = new Harass()
 
 
 scanners.add(unperson)
 scanners.add(perv)
+scanners.add(markov)
 
 client.on('message', async message  =>  
 {
 	scanners.feed(message)
 })
 
-/*
 //setTimeout(scrambleAll, Math.random() * (1600 * 1000));
-client.on("ready", async =>
-	{
-		client.guilds.cache.forEach(async server => server.members.fetch());
-		client.guilds.cache.forEach(async server => 
-			{
-				server.channels.cache.each(c => eatMessages(c))
-				setTimeout(spamPost, 3000);
-				console.log("ready!");
-			}
-		);
-
-	});
-*/
+client.on('ready', async =>
+	markov.init(client)
+)
 
