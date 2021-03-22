@@ -150,9 +150,9 @@ async function postWave (m, c)
 	for(var i = 0; i < Math.random() * 10; i++)
 	{
 		m.post(c)
-		await sleep (Math.random() * 60)
+		await sleep (Math.random() * 60 * 1000)
 	}
-	await sleep( Math.random() * 60 * 60)
+	await sleep( Math.random() * 60 * 6 * 1000)
 	postWave(m, c)
 }
 
