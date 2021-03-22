@@ -92,7 +92,16 @@ function MarkovKing (c, h)
 		let acc = 0
 		for(let key of this.generators.keys())
 		{
-			if (acc++ === index) return {member: key, message: this.generators.get(key).getSentence()}
+			if(Math.random() > 0.5)
+			{
+				if (acc++ === index) return {member: key, message: this.generators.get(key).getCorpus()}
+			}
+			else
+			{
+
+				if (acc++ === index) return {member: key, message: this.generators.get(key).getSentence()}
+			}
+
 		}
 	}
 
@@ -122,7 +131,10 @@ function MarkovKing (c, h)
 		if(split[0] == '!rpost')
 		{
 			await this.post(m.channel)
-			m.delete()
+			if(m.channel.name !== 'hell')
+			{
+				m.delete()
+			}
 		}
 
 		if(split[0] == '!wave')
