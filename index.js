@@ -111,11 +111,30 @@ function Unpersonator(hooks)
 	}
 }
 
+function lalaBot (hooks)
+{
+	this.hooks = hooks
+	this.feed  = async function (m)
+	{
+		if(m.webhookId) return 
+		if(m.channel.name != "general") return 
+		if(m.mentions.users.has( client.user.id) && !m.author.bot)
+		{
+			m.reply('durrrrr durrrr')
+			return
+		}
+	}
+}
+
+	
+
 const hookMan  = new HookManager()
 const unperson = new Unpersonator(hookMan)
 const scanners = new MessageScanners()
+const bot      = new lalaBot()
 
 scanners.add(unperson)
+scanners.add(bot)
 
 client.on('messageCreate', async message  =>  
 {
