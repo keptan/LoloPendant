@@ -1,5 +1,7 @@
 const Discord = require('discord.js')
-const config = require('./config.json')
+const config  = require('./config.json')
+const needle  = require('needle')
+const chara   = require('./chara.json')
 
 const { Client, IntentsBitField } = require('discord.js');
 
@@ -15,12 +17,44 @@ function sleep(ms)
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function gptApi ()
+{
+
+	this.headers =
+		{
+			'Content-Type'  : 'application/json',
+			'Authorization' : 'Bearer ' + chara.password,
+		}
+	this.messageLog =
+		[
+			{'role' : 'system',
+			 'content' : chara.prompt}
+		]
+
+	this.data =
+		{
+			'model': chara.model, 
+			'max_tokens': 1000
+		}
+
+	this.ping = async function (text)
+	{
+		this.messageLog.push({'role' : 'user', 'content' : text})
+		this.data['messages'] = this.messageLog
+		const response = await needle('post', chara.endpoint, this.data, {headers: this.headers})
+		this.messageLog.push({'role': 'system', 'content': response.body.choices[0].message})
+		return response.body.choices[0].message
+	}
+}
+
+
 function HookManager ()
 {
 	this.hooks = new Map()
 
 	this.retrieveHook =  async function (channel)
 	{
+
 		if(this.hooks.has(channel)) return this.hooks.get(channel)
 
 		const fetch = await channel.fetchWebhooks()
@@ -114,13 +148,15 @@ function Unpersonator(hooks)
 function lalaBot (hooks)
 {
 	this.hooks = hooks
+	this.gpt   = new gptApi()
 	this.feed  = async function (m)
 	{
 		if(m.webhookId) return 
 		if(m.channel.name != "general") return 
 		if(m.mentions.users.has( client.user.id) && !m.author.bot)
 		{
-			m.reply('durrrrr durrrr')
+			const reply = await this.gpt.ping(m.content)
+			m.reply(reply)
 			return
 		}
 	}
