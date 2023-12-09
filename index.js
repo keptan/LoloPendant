@@ -175,9 +175,10 @@ function lalaBot (hooks)
 	this.feed  = async function (m)
 	{
 		if(m.webhookId) return 
-		if(m.channel.name != "bottest") return 
+		if(m.channel.name != "general") return 
 		if(m.mentions.users.has( client.user.id) && !m.author.bot)
 		{
+			await m.channel.sendTyping()
 			const reply = await this.gpt.ping(Discord.cleanContent(m.content, m.channel))
 			m.reply(reply)
 			return
