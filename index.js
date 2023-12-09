@@ -21,7 +21,9 @@ function sleep(ms)
 function gptApi ()
 {
 	console.log("gpt api")
-	this.limiter = new Limiter(2, 70)
+	this.limiter = new Limiter(1, 32)
+	this.limiter.awaitTurn()
+	this.limiter.awaitTurn()
 
 	this.headers =
 		{
@@ -31,20 +33,23 @@ function gptApi ()
 	this.messageLog =
 		[
 			{'role' : 'system',
-			 'content' : chara.prompt}
+			 'content' : chara.prompt + ' ' + chara.jb}
 		]
 
 	this.data =
 		{
 			'model': chara.model, 
-			'max_tokens': 1000
+			'max_tokens': 425,
+			'temperature': 0.9, 
+			'frequency_penalty': 0.2,
+			'presence_penalty': 0.1,
 		}
 
 	this.ping = async function (text)
 	{
+		const limit = await this.limiter.awaitTurn()
 		this.messageLog.push({'role' : 'user', 'content' : text})
 		this.data['messages'] = this.messageLog
-		const limit = await this.limiter.awaitTurn()
 		var response = {}
 		try
 		{
