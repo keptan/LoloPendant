@@ -21,7 +21,7 @@ function sleep(ms)
 function gptApi ()
 {
 	console.log("gpt api")
-	this.limiter = new Limiter(2, 60)
+	this.limiter = new Limiter(2, 70)
 
 	this.headers =
 		{
@@ -44,12 +44,24 @@ function gptApi ()
 	{
 		this.messageLog.push({'role' : 'user', 'content' : text})
 		this.data['messages'] = this.messageLog
-		console.log('test1')
 		const limit = await this.limiter.awaitTurn()
-		console.log('test2')
-		const response = await needle('post', chara.endpoint, this.data, {headers: this.headers})
-		this.messageLog.push({'role': 'system', 'content': response.body.choices[0].message})
+		var response = {}
+		try
+		{
+		response = await needle('post', chara.endpoint, this.data, {headers: this.headers})
+		this.messageLog.push(response.body.choices[0].message)
 		return response.body.choices[0].message
+		}
+		catch (error)
+		{
+			console.error(error)
+			console.error(response.error)
+			console.error(response.statusCode)
+			console.error(response.body)
+			console.error(this.data)
+			console.error(this.data['messages'])
+			return "beep error"
+		}
 	}
 }
 
@@ -120,8 +132,8 @@ function Unpersonator(hooks)
 		}
 		if(m.channel.name !== "anon") return
 		
-		files = []
-		embeds = []
+		var files = []
+		var embeds = []
 		if(m.attachments)
 		{
 			//await sleep(1000)
