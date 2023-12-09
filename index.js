@@ -1,9 +1,10 @@
-const Discord = require('discord.js')
-const config  = require('./config.json')
-const needle  = require('needle')
-const chara   = require('./chara.json')
+import Discord from 'discord.js';
+import config from './config.json' assert {type: 'json'}
+import needle from 'needle';
+import chara from './chara.json' assert {type: 'json'}
+import Limiter from 'priority-limiter';
 
-const { Client, IntentsBitField } = require('discord.js');
+const { Util, Client, IntentsBits, IntentsBitField } = Discord
 
 const myIntents = new IntentsBitField();
 myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.MessageContent, IntentsBitField.Flags.GuildPresences, IntentsBitField.Flags.GuildMembers);
@@ -19,6 +20,8 @@ function sleep(ms)
 
 function gptApi ()
 {
+	console.log("gpt api")
+	this.limiter = new Limiter(2, 60)
 
 	this.headers =
 		{
@@ -41,6 +44,9 @@ function gptApi ()
 	{
 		this.messageLog.push({'role' : 'user', 'content' : text})
 		this.data['messages'] = this.messageLog
+		console.log('test1')
+		const limit = await this.limiter.awaitTurn()
+		console.log('test2')
 		const response = await needle('post', chara.endpoint, this.data, {headers: this.headers})
 		this.messageLog.push({'role': 'system', 'content': response.body.choices[0].message})
 		return response.body.choices[0].message
@@ -152,10 +158,10 @@ function lalaBot (hooks)
 	this.feed  = async function (m)
 	{
 		if(m.webhookId) return 
-		if(m.channel.name != "general") return 
+		if(m.channel.name != "bottest") return 
 		if(m.mentions.users.has( client.user.id) && !m.author.bot)
 		{
-			const reply = await this.gpt.ping(m.content)
+			const reply = await this.gpt.ping(Discord.cleanContent(m.content, m.channel))
 			m.reply(reply)
 			return
 		}
