@@ -20,7 +20,6 @@ function sleep(ms)
 
 function gptApi ()
 {
-	console.log("gpt api")
 	this.limiter = new Limiter(1, 32)
 	this.limiter.awaitTurn()
 	this.limiter.awaitTurn()
@@ -48,7 +47,6 @@ function gptApi ()
 	this.ping = async function (text)
 	{
 		const limit = await this.limiter.awaitTurn()
-		this.messageLog.push({'role' : 'user', 'content' : text})
 		this.data['messages'] = this.messageLog
 		var response = {}
 		try
@@ -67,6 +65,12 @@ function gptApi ()
 			console.error(this.data['messages'])
 			return "beep error"
 		}
+	}
+
+	this.contextAdd = function (text)
+	{
+		this.messageLog.push({'role' : 'user', 'content' : text})
+		return
 	}
 }
 
@@ -175,13 +179,18 @@ function lalaBot (hooks)
 	this.feed  = async function (m)
 	{
 		if(m.webhookId) return 
-		if(m.channel.name != "general") return 
-		if(m.mentions.users.has( client.user.id) && !m.author.bot)
+
+
+		if((Math.random() > 0.9 || (m.channel.name == "lala-general" && m.mentions.users.has( client.user.id))) && !m.author.bot)
 		{
 			await m.channel.sendTyping()
-			const reply = await this.gpt.ping(Discord.cleanContent(m.content, m.channel))
+			const reply = await this.gpt.ping(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel).slice(13))
 			m.reply(reply)
 			return
+		}
+		else 
+		{
+			this.gpt.contextAdd(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel).slice(13))
 		}
 	}
 }
