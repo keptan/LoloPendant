@@ -4,6 +4,16 @@ import needle from 'needle';
 import chara from './chara.json' assert {type: 'json'}
 import Limiter from 'priority-limiter';
 
+import {
+  encode,
+  encodeChat,
+  decode,
+  isWithinTokenLimit,
+  encodeGenerator,
+  decodeGenerator,
+  decodeAsyncGenerator,
+} from 'gpt-tokenizer/model/gpt-4-32k'
+
 const { Util, Client, IntentsBits, IntentsBitField } = Discord
 
 const myIntents = new IntentsBitField();
@@ -20,9 +30,12 @@ function sleep(ms)
 
 function gptApi ()
 {
+	this.tokenCount = 0;
+	this.tokenLimit = 15000;
 	this.limiter = new Limiter(1, 32)
 	this.limiter.awaitTurn()
 	this.limiter.awaitTurn()
+
 
 	this.headers =
 		{
@@ -35,24 +48,41 @@ function gptApi ()
 			 'content' : chara.prompt + ' ' + chara.jb}
 		]
 
+
 	this.data =
 		{
 			'model': chara.model, 
-			'max_tokens': 425,
+			'max_tokens': 1000,
 			'temperature': 0.9, 
 			'frequency_penalty': 0.2,
 			'presence_penalty': 0.1,
 		}
 
+	this.contextAdd = function (text)
+	{
+		this.messageLog.push({'role' : 'user', 'content' : text + '\n'})
+		while(!isWithinTokenLimit(this.messageLog, this.tokenLimit))
+		{
+			console.log("perging messages to make up for token length")
+			const index = Math.floor(Math.pow(Math.random(), 2) * (this.messageLog.length - 3)) + 1
+			this.messageLog.splice(index, 1)
+		}
+		return
+	}
+
+
+
+
 	this.ping = async function (text)
 	{
 		const limit = await this.limiter.awaitTurn()
+		this.contextAdd(text)
 		this.data['messages'] = this.messageLog
 		var response = {}
 		try
 		{
 		response = await needle('post', chara.endpoint, this.data, {headers: this.headers})
-		this.messageLog.push(response.body.choices[0].message)
+		this.contextAdd(response.body.choices[0].message)
 		return response.body.choices[0].message
 		}
 		catch (error)
@@ -65,12 +95,6 @@ function gptApi ()
 			console.error(this.data['messages'])
 			return "beep error"
 		}
-	}
-
-	this.contextAdd = function (text)
-	{
-		this.messageLog.push({'role' : 'user', 'content' : text})
-		return
 	}
 }
 
@@ -143,9 +167,9 @@ function Unpersonator(hooks)
 		
 		var files = []
 		var embeds = []
-		if(m.attachments)
+		if(m.attachments || m.embeds)
 		{
-			//await sleep(1000)
+			await sleep(1000)
 		}
 
 		for( [k, i] of m.attachments)
@@ -179,18 +203,23 @@ function lalaBot (hooks)
 	this.feed  = async function (m)
 	{
 		if(m.webhookId) return 
+		if(m.channel.name == 'anon') 
+		{
 
+			this.gpt.contextAdd(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel))
+			return
+		}
 
-		if((Math.random() > 0.9 || (m.channel.name == "lala-general" && m.mentions.users.has( client.user.id))) && !m.author.bot)
+		if(((Math.random() > 0.85) || (m.channel.name == "lala-general" && m.mentions.users.has( client.user.id))) && !m.author.bot)
 		{
 			await m.channel.sendTyping()
-			const reply = await this.gpt.ping(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel).slice(13))
+			const reply = await this.gpt.ping(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel))
 			m.reply(reply)
 			return
 		}
 		else 
 		{
-			this.gpt.contextAdd(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel).slice(13))
+			this.gpt.contextAdd(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel))
 		}
 	}
 }
