@@ -1,6 +1,9 @@
 import Discord from 'discord.js';
 import config from './config.json' assert {type: 'json'}
+import proxy from './proxy.json' assert {type: 'json'}
+import chara from './chara.json' assert {type: 'json'}
 import {openAiProxy} from './openAiProxy.js'
+
 
 //imports for discord permissions
 const { Util, Client, IntentsBits, IntentsBitField } = Discord
@@ -130,28 +133,28 @@ function Unpersonator(hooks)
 function lalaBot (hooks)
 {
 	this.hooks = hooks
-	this.gpt   = new openAiProxy()
+	this.gpt   = new openAiProxy(proxy, chara)
 
 	this.formatMessage = function ( message)
 	{
-		return m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel))
+		return message.author.displayName + ' : ' + Discord.cleanContent(message.content, message.channel)
 	}
 
 	this.ping = async function ( message)
 	{
-		await m.channel.sendTyping()
+		await message.channel.sendTyping()
 		const reply = await this.gpt.ping( this.formatMessage( message))
-		m.reply(reply).catch( (error) => console.error( error))
+		message.reply(reply).catch( (error) => console.error( error))
 	}
 
 	this.reply = async function ( message)
 	{
 		const filteredPosters = new Set(['224350319725903874', '993850389273256049'])
 
-		if(m.webhookId) return 
-		if(m.content.length == 0) return
-		if(m.author.id in filteredPosters) return 
-		if(m.channel.name == 'anon' && Math.random() > 0.5)
+		if(message.webhookId) return 
+		if(message.content.length == 0) return
+		if(message.author.id in filteredPosters) return 
+		if(message.channel.name == 'anon' && Math.random() > 0.5)
 		{
 			this.ping( message)
 			return 
@@ -172,8 +175,6 @@ function lalaBot (hooks)
 	}
 }
 
-	
-
 const hookMan  = new HookManager()
 const unperson = new Unpersonator(hookMan)
 const scanners = new MessageScanners()
@@ -187,11 +188,3 @@ client.on('messageCreate', async message  =>
 	scanners.feed(message)
 })
 
-async function lineEater ()
-{
-	const line = await newLine.question(':_') 
-	console.log(line)
-	lineEater()
-}
-
-lineEater()
