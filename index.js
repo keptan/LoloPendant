@@ -1,124 +1,42 @@
 import Discord from 'discord.js';
 import config from './config.json' assert {type: 'json'}
-import needle from 'needle';
-import chara from './chara.json' assert {type: 'json'}
-import Limiter from 'priority-limiter';
+import {openAiProxy} from './openAiProxy.js'
 
-import {
-  encode,
-  encodeChat,
-  decode,
-  isWithinTokenLimit,
-  encodeGenerator,
-  decodeGenerator,
-  decodeAsyncGenerator,
-} from 'gpt-tokenizer/model/gpt-4-32k'
-
+//imports for discord permissions
 const { Util, Client, IntentsBits, IntentsBitField } = Discord
-
 const myIntents = new IntentsBitField();
 myIntents.add(IntentsBitField.Flags.Guilds, IntentsBitField.Flags.GuildMessages, IntentsBitField.Flags.MessageContent, IntentsBitField.Flags.GuildPresences, IntentsBitField.Flags.GuildMembers);
 
+//spawn client and read the client token out of the json folder
 const client = new Client({ intents: myIntents });
-
 client.login(config.token)
 
+//ZzzzzzZZzzzz
 function sleep(ms) 
 {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-function gptApi ()
-{
-	this.tokenCount = 0;
-	this.tokenLimit = 15000;
-	this.limiter = new Limiter(1, 32)
-	this.limiter.awaitTurn()
-	this.limiter.awaitTurn()
-
-
-	this.headers =
-		{
-			'Content-Type'  : 'application/json',
-			'Authorization' : 'Bearer ' + chara.password,
-		}
-	this.messageLog =
-		[
-			{'role' : 'system',
-			 'content' : chara.prompt + ' ' + chara.jb}
-		]
-
-
-	this.data =
-		{
-			'model': chara.model, 
-			'max_tokens': 1000,
-			'temperature': 0.9, 
-			'frequency_penalty': 0.2,
-			'presence_penalty': 0.1,
-		}
-
-	this.contextAdd = function (text)
-	{
-		this.messageLog.push({'role' : 'user', 'content' : text + '\n'})
-		while(!isWithinTokenLimit(this.messageLog, this.tokenLimit))
-		{
-			console.log("perging messages to make up for token length")
-			const index = Math.floor(Math.pow(Math.random(), 2) * (this.messageLog.length - 3)) + 1
-			this.messageLog.splice(index, 1)
-		}
-		return
-	}
-
-
-
-
-	this.ping = async function (text)
-	{
-		const limit = await this.limiter.awaitTurn()
-		this.contextAdd(text)
-		this.data['messages'] = this.messageLog
-		var response = {}
-		try
-		{
-		response = await needle('post', chara.endpoint, this.data, {headers: this.headers})
-		this.contextAdd(response.body.choices[0].message)
-		return response.body.choices[0].message
-		}
-		catch (error)
-		{
-			console.error(error)
-			console.error(response.error)
-			console.error(response.statusCode)
-			console.error(response.body)
-			console.error(this.data)
-			console.error(this.data['messages'])
-			return "beep error"
-		}
-	}
-}
-
-
+//manages hooks to all the channels we need
 function HookManager ()
 {
-	this.hooks = new Map()
+  this.hooks = new Map()
 
-	this.retrieveHook =  async function (channel)
-	{
+  this.retrieveHook =  async function (channel)
+  {
+    if(this.hooks.has(channel)) return this.hooks.get(channel)
 
-		if(this.hooks.has(channel)) return this.hooks.get(channel)
+    const fetch = await channel.fetchWebhooks()
+    const found = fetch.first()
+    if(found) return found
 
-		const fetch = await channel.fetchWebhooks()
-		const found = fetch.first()
-		if(found) return found
-
-		this.hooks.set(channel, await channel.createWebhook({name: "loloPendant"}))
-		
-		console.log("4 reutrning webhook...")
-		return this.hooks.get(channel)
-	}
+    this.hooks.set(channel, await channel.createWebhook({name: "loloPendant"}))
+    return this.hooks.get(channel)
+  }
 }
 
+//this is what we use to manage all our little bot systems
+//that register themselves here, and then MessageScanner will propogate the messages to each system
 function MessageScanners ()
 {
 	this.scanners = new Set()
@@ -142,9 +60,11 @@ function MessageScanners ()
 	}
 }
 
+//system used to anonimize all the posters inside a channel
 function Unpersonator(hooks)
 {
 	this.hooks = hooks
+	//get everyones names and profile pictures into the discord cache
 	this.populateNames = async function (guild)
 	{
 		var name, uri
@@ -158,69 +78,97 @@ function Unpersonator(hooks)
 
 	this.feed = async function (m)
 	{
-		if(m.webhookId)
+		try
 		{
-			console.log("exiting feed because its recursive from a webhook or whatever")
-			return 
-		}
-		if(m.channel.name !== "anon") return
-		
-		var files = []
-		var embeds = []
-		if(m.attachments || m.embeds)
-		{
-			await sleep(1000)
-		}
+			if(m.webhookId || m.channel.name != "anon") return
+			
+			//rip the embeds and files out of the post and then stick them into these variables
+			var files = []
+			var embeds = []
+			if(m.attachments || m.embeds) await sleep(1000)
 
-		for( [k, i] of m.attachments)
-		{
-			files.push(Discord.AttachmentBuilder.from(i))
-		}
+			//this seems to break a lot.... thats why we have this entire section encasaed in a try block..
+			if(m.attachments)
+			{
+				for( let [k, i] of m.attachments)
+				{
+					files.push(Discord.AttachmentBuilder.from(i))
+				}
+			}
 
-		for( [k, i] of m.embeds)
-		{
-			embeds.push(Discord.EmbedBuilder.from(i))
-		}
+			if(m.embeds)
+			{
+				for( let [k, i] of m.embeds)
+				{
+					embeds.push(Discord.EmbedBuilder.from(i))
+				}
+			}
 
-		const member = await this.populateNames(m.guild)
-		const hook   = await this.hooks.retrieveHook(m.channel)
-	//	hook.send(m.content, {files: uris, attatchments: m.attatchments, username: member.name, avatarURL: member.uri}).catch(e => undefined)
-		hook.send({
-			content: m.content, 
-			username: member.name, 
-			avatarURL: member.uri,
-			files: files,
-			embeds: embeds,
-		})
-		m.delete()
+			//fetch our randomly chosen member to steal their name and avatar
+			//fetch our hook to post the post into the anon channel
+			const member = await this.populateNames(m.guild)
+			const hook   = await this.hooks.retrieveHook(m.channel)
+
+			hook.send(
+				{
+					content: m.content, 
+					username: member.name, 
+					avatarURL: member.uri,
+					files: files,
+					embeds: embeds,
+				}).catch((error) => console.error(error))
+
+			//wipe the original message from the channel
+			m.delete()
+		}
+		catch (error) {console.error(error)}
 	}
 }
 
+//call the openAiProxy with all our messages, and decide if we should save the context
+//or just automatically reply
 function lalaBot (hooks)
 {
 	this.hooks = hooks
-	this.gpt   = new gptApi()
+	this.gpt   = new openAiProxy()
+
+	this.formatMessage = function ( message)
+	{
+		return m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel))
+	}
+
+	this.ping = async function ( message)
+	{
+		await m.channel.sendTyping()
+		const reply = await this.gpt.ping( this.formatMessage( message))
+		m.reply(reply).catch( (error) => console.error( error))
+	}
+
+	this.reply = async function ( message)
+	{
+		const filteredPosters = new Set(['224350319725903874', '993850389273256049'])
+
+		if(m.webhookId) return 
+		if(m.content.length == 0) return
+		if(m.author.id in filteredPosters) return 
+		if(m.channel.name == 'anon' && Math.random() > 0.5)
+		{
+			this.ping( message)
+			return 
+		}
+
+		if(Math.random() > 0.95)
+		{
+			this.ping( message)
+			return 
+		}
+
+		this.gpt.contextAdd( this.formatMessage(message)) 
+	}
+
 	this.feed  = async function (m)
 	{
-		if(m.webhookId) return 
-		if(m.channel.name == 'anon') 
-		{
-
-			this.gpt.contextAdd(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel))
-			return
-		}
-
-		if(((Math.random() > 0.85) || (m.channel.name == "lala-general" && m.mentions.users.has( client.user.id))) && !m.author.bot)
-		{
-			await m.channel.sendTyping()
-			const reply = await this.gpt.ping(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel))
-			m.reply(reply)
-			return
-		}
-		else 
-		{
-			this.gpt.contextAdd(m.author.displayName + ' : ' + Discord.cleanContent(m.content, m.channel))
-		}
+		this.reply( m)
 	}
 }
 
@@ -239,3 +187,11 @@ client.on('messageCreate', async message  =>
 	scanners.feed(message)
 })
 
+async function lineEater ()
+{
+	const line = await newLine.question(':_') 
+	console.log(line)
+	lineEater()
+}
+
+lineEater()
