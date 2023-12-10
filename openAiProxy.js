@@ -9,22 +9,22 @@ function openAiProxy (proxyConfig, charaConfig)
 	this.limiter = new Limiter(1, 32)
 	this.messageLog = []
 
-
 	this.headers =
-		{
-			'Content-Type'  : 'application/json',
-			'Authorization' : 'Bearer ' + chara.password,
-		}
+	{
+		'Content-Type'  : 'application/json',
+		'Authorization' : 'Bearer ' + proxyConfig.password,
+	}
+
 	this.messageLog =
 		[
 			{'role' : 'system',
-			 'content' : chara.prompt + ' ' + chara.jb}
+			 'content' : charaConfig.prompt + ' ' + proxyConfig.jb}
 		]
 
 
 	this.data =
 		{
-			'model': chara.model, 
+			'model': proxyConfig.model, 
 			'max_tokens': 425,
 			'temperature': 0.9, 
 			'frequency_penalty': 0.2,
@@ -54,7 +54,7 @@ function openAiProxy (proxyConfig, charaConfig)
 		var response = {}
 		try
 		{
-		response = await needle('post', chara.endpoint, this.data, {headers: this.headers})
+		response = await needle('post', proxyConfig.endpoint, this.data, {headers: this.headers})
 		this.contextAdd(response.body.choices[0].message)
 		return response.body.choices[0].message
 		}
@@ -70,7 +70,7 @@ function openAiProxy (proxyConfig, charaConfig)
 			this.messageLog =
 				[
 					{'role' : 'system',
-					 'content' : chara.prompt + ' ' + chara.jb}
+					 'content' : charaConfig.prompt + ' ' + proxyConfig.jb}
 				]
 			return "beep error"
 
