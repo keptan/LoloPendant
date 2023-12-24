@@ -2,7 +2,8 @@ import Discord from 'discord.js';
 import config from './config.json' assert {type: 'json'}
 import proxy from './proxy.json' assert {type: 'json'}
 import chara from './chara.json' assert {type: 'json'}
-import {openAiProxy} from './openAiProxy.js'
+import {CContext, OpenAiProxy} from './openAiProxy.js'
+import {readChar} from './fileRead.js'
 
 
 //imports for discord permissions
@@ -133,40 +134,91 @@ function Unpersonator(hooks)
 function lalaBot (hooks)
 {
 	this.hooks = hooks
-	this.gpt   = new openAiProxy(proxy, chara)
+	this.gpt   = new OpenAiProxy(proxy, chara)
+
+	this.generalBot = new CContext( readChar('./yume.png'))
+	this.rpBot	     = new CContext( readChar('./yume.png'), 'https://files.catbox.moe/6iwc1p.png')
+	this.rena	     = new CContext( readChar('./yuki.png'), 'https://files.catbox.moe/pk102u.png')
+
+	this.gpt.initChara( this.rpBot)
+	this.gpt.initChara( this.generalBot)
+	this.gpt.initChara( this.rena)
+
+	this.channelIndex = new Map()
+	this.channelIndex.set('general', this.generalBot)
+	this.channelIndex.set('lala-general', this.rpBot)
+	this.channelIndex.set('rena', this.rena)
+
+	/*
+	const guild = await client.guilds.fetch('1084884995442741378')
+	let channels = await guilds.channels.fetch() 
+	*/
 
 	this.formatMessage = function ( message)
 	{
 		return message.author.displayName + ' : ' + Discord.cleanContent(message.content, message.channel)
 	}
 
-	this.ping = async function ( message)
+	this.ping = async function ( charaConfig, message)
 	{
 		await message.channel.sendTyping()
-		const reply = await this.gpt.ping( this.formatMessage( message))
-		message.reply(reply).catch( (error) => console.error( error))
+		const reply = await this.gpt.ping( charaConfig, this.formatMessage( message))
+		//message.reply(reply).catch( (error) => console.error( error))
+
+		console.log(reply) 
+
+		const hook   = await this.hooks.retrieveHook(message.channel)
+		hook.send(
+			{
+				content: reply.content, 
+				username: charaConfig.charaConfig.name, 
+				avatarURL: charaConfig.avatar,
+			}).catch((error) => console.error(error))
 	}
 
 	this.reply = async function ( message)
 	{
-		const filteredPosters = new Set(['224350319725903874', '993850389273256049'])
+		const filteredPosters = new Set(['224350319725903874', '_993850389273256049'])
+		const favoredPosters  = new Set(['1175216131020177489','915327034518020127']) 
 
-		if(message.webhookId) return 
+		if(!this.channelIndex.has( message.channel.name)) return 
+
+		console.log( message.channel.name + ' ' + this.channelIndex.get( message.channel.name).charaConfig.name)
+		if(message.author.bot) return 
 		if(message.content.length == 0) return
-		if(message.author.id in filteredPosters) return 
-		if(message.channel.name == 'anon' && Math.random() > 0.5)
+		if(filteredPosters.has( message.author.id)) return 
+
+
+		if(message.channel.name == 'lala-general')
+		{
+			if(message.mentions.users.has( client.user.id) /* && Math.random() > 0.3 */)
+			{
+				this.ping( this.channelIndex.get( message.channel.name), message)
+				return 
+			}
+		}
+
+		if(message.mentions.users.has( client.user.id) /* && favoredPosters.has( message.author.id)*/)
+		{
+			this.ping( this.channelIndex.get( message.channel.name), message)
+			return
+		}
+
+		/*
+		if(message.channel.name == 'lala-general' && Math.random() > 0.5)
 		{
 			this.ping( message)
 			return 
 		}
+		*/
 
-		if(Math.random() > 0.95)
+		if(Math.random() > 0.94)
 		{
-			this.ping( message)
+			this.ping( this.channelIndex.get( message.channel.name), message)
 			return 
 		}
 
-		this.gpt.contextAdd( this.formatMessage(message)) 
+		this.gpt.contextAdd( this.channelIndex.get( message.channel.name), this.formatMessage(message)) 
 	}
 
 	this.feed  = async function (m)
@@ -178,7 +230,7 @@ function lalaBot (hooks)
 const hookMan  = new HookManager()
 const unperson = new Unpersonator(hookMan)
 const scanners = new MessageScanners()
-const bot      = new lalaBot()
+const bot      = new lalaBot(hookMan)
 
 scanners.add(unperson)
 scanners.add(bot)
